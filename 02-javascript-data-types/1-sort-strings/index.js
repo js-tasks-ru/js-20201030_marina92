@@ -5,8 +5,12 @@
  * @returns {string[]}
  */
 export function sortStrings(arr, param = 'asc') {
-  const arrNew = new Array();
-  for (let i = 0; i < arr.length; i++) {
+  switch(param){
+    case 'asc': return sorting(1, arr);
+    case 'desc': return sorting(-1, arr);
+    default: return arr;
+  }
+  /*for (let i = 0; i < arr.length; i++) {
       let b = false;
       for (let j = 0; j < arrNew.length; j++) {
           const sr = arr[i].localeCompare(arrNew[j], ['ru', 'en'], { caseFirst: 'upper' });
@@ -26,5 +30,9 @@ export function sortStrings(arr, param = 'asc') {
     }
     else{
         return arrNew;          
-    }
+    }*/
+  }
+
+  function sorting(i, arr){
+    return [...arr].sort((a,b)=> i * a.localeCompare(b, ['ru', 'en'], { caseFirst: 'upper' }));
   }
