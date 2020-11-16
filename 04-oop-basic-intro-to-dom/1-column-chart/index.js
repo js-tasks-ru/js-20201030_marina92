@@ -8,10 +8,10 @@ export default class ColumnChart {
     link = '',
     value = 0
   } = {}){
-    this.data = data,
-    this.label = label,
-    this.value = value,
-    this.link = link
+    this.data = data;
+    this.label = label;
+    this.value = value;
+    this.link = link;
 
     this.render();
   }
