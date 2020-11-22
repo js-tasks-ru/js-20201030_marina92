@@ -1,10 +1,20 @@
 export default class SortableTable {
-    element;
+  element;
     subElements;
+    headerList;
+    dataList;
+    sorted;
   
-    constructor(header = [], { data = []}){
+    constructor(header = [], {
+      data = [],
+      sorted = {
+        id: header.find(a => a.sortable).id,
+        order: 'asc'
+      }}){
       this.headerList = header;
       this.dataList = data;
+      this.sorted = sorted;
+      //console.log(this.sorted);
       this.showElement();
     }
 
@@ -13,29 +23,40 @@ export default class SortableTable {
       <span class="sort-arrow"></span>
     </span>`;
 
+    onSortColumn = event =>{
+      const column = event.target.closest('[data-sortable="true"]')
+      if(column){
+        const { id, order } = column.dataset;
+        this.sort(id, this.getOrder(order)); 
+        column.dataset.order = this.getOrder(order);
+
+        //Проставляем треугольник
+        const arrow = column.querySelector(`.sortable-table__sort-arrow`);
+        //console.log(arrow);
+        if(!arrow){          
+          column.append(this.subElements.arrow);
+        }
+
+        //Обновляем строки в таблице
+        this.subElements.body.innerHTML = this.getRow();
+      }
+    }
+    
+    getOrder(order){
+      switch(order){
+        case 'asc': return 'desc'; break;
+        case 'desc': return 'asc'; break;
+      }
+    }
+
     showElement(){
+      this.sort(this.sorted.id, this.sorted.order);
       const elem = document.createElement('div');
       elem.innerHTML = this.getTemplate();
       this.element = elem.firstElementChild;
       this.subElements = this.getSubElements(this.element);
-      const myEvent = (event) => {
-        let target = event.target;        
-        if (target.tagName == 'SPAN'){
-            target = target.parentNode;
-        }
-  
-        const fieldValue = target.dataset.id;
-        let orderValue;
-        switch(target.dataset.order){
-          case 'asc': orderValue = 'desc'; break;
-          case 'desc': orderValue = 'asc'; break;
-          default: orderValue = 'desc'; break;
-        }
-  
-        this.sort(fieldValue, orderValue);
-      };
-      this.subElements.header.addEventListener('pointerdown', myEvent);
-      this.sort('title','asc');
+
+      this.subElements.header.addEventListener('pointerdown', this.onSortColumn);
     }
 
     getSubElements(element){
@@ -59,10 +80,12 @@ export default class SortableTable {
         return template;
     }
 
-    getColumn(colName = "title"){
+    getColumn(){
       const res = this.headerList.map(item => {
-        const r = `<div class="sortable-table__cell" data-id="${item.id}" data-sortable="${item.sortable}" data-order=""><span>${item.title}</span>
-                    ${this.arrowTemplate}</div>`;
+        const r = `<div class="sortable-table__cell" data-id="${item.id}" data-sortable="${item.sortable}"
+                      data-order="${item.id === this.sorted.id ? this.sorted.order : ''}"><span>${item.title}</span>
+                    ${item.id === this.sorted.id ? this.arrowTemplate : ''}
+                    </div>`;
         return r;
       });
 
@@ -98,15 +121,6 @@ export default class SortableTable {
                 default: return;
             }
         }
-        //Обновляем строки в таблице
-        this.subElements.body.innerHTML = this.getRow();
-        const allColumn = this.element.querySelectorAll('.sortable-table__cell[data-id]');
-        const currentColumn = this.element.querySelector(`.sortable-table__cell[data-id="${field.id}"]`);
-        for(let el of allColumn){
-            el.dataset.order = '';
-        }
-
-        currentColumn.dataset.order = orderValue;
     }
 
     sorting(i, field = {}){
