@@ -12,19 +12,39 @@ export default class Page {
   subElements = {};
   components = {};
 
-  async updateComponents (from, to) {
-    const data = await fetchJson(`${BACKEND_URL}api/dashboard/bestsellers?_start=1&_end=21&from=${from.toISOString()}&to=${to.toISOString()}&_sort=title&_order=asc`);
+  async getDataForColumnCharts (from, to) {
+    const ORDERS = `${BACKEND_URL}api/dashboard/orders?from=${from.toISOString()}&to=${to.toISOString()}`;
+    const SALES = `${BACKEND_URL}api/dashboard/sales?from=${from.toISOString()}&to=${to.toISOString()}`;
+    const CUSTOMERS = `${BACKEND_URL}api/dashboard/customers?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
 
-    this.components.sortableTable.addRows(data);
-    this.components.sortableTable.update(from, to);
-    this.components.ordersChart.update(from, to);
-    this.components.salesChart.update(from, to);
-    this.components.customersChart.update(from, to);
+    const ordersData = fetchJson(ORDERS);
+    const salesData = fetchJson(SALES);
+    const customersData = fetchJson(CUSTOMERS);
+
+    const data = await Promise.all([ordersData, salesData, customersData]);
+    return data.map(item => Object.values(item));
   }
 
-  initComponents () {
+  async updateTableComponent (from, to) {
+    const data = await fetchJson(`${BACKEND_URL}api/dashboard/bestsellers?_start=1&_end=20&from=${from.toISOString()}&to=${to.toISOString()}`);
+    this.components.sortableTable.addRows(data);
+  }
+
+  async updateChartsComponents (from, to) {
+    const [ordersData, salesData, customersData] = await this.getDataForColumnCharts(from, to);
+    const ordersDataTotal = ordersData.reduce((accum, item) => accum + item);
+    const salesDataTotal = salesData.reduce((accum, item) => accum + item);
+    const customersDataTotal = customersData.reduce((accum, item) => accum + item);
+
+    this.components.ordersChart.update({headerData: ordersDataTotal, bodyData: ordersData});
+    this.components.salesChart.update({headerData: '$' + salesDataTotal, bodyData: salesData});
+    this.components.customersChart.update({headerData: customersDataTotal, bodyData: customersData});
+  }
+
+  async initComponents () {
     const to = new Date();
     const from = new Date(to.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const [ordersData, salesData, customersData] = await this.getDataForColumnCharts(from, to);
 
     const rangePicker = new RangePicker({
       from,
@@ -37,38 +57,31 @@ export default class Page {
     });
 
     const ordersChart = new ColumnChart({
-      url: 'api/dashboard/orders',
-      range: {
-        from,
-        to
-      },
+      data: ordersData,
       label: 'orders',
+      value: ordersData.reduce((accum, item) => accum + item),
       link: '#'
     });
 
     const salesChart = new ColumnChart({
-      url: 'api/dashboard/sales',
+      data: salesData,
       label: 'sales',
-      range: {
-        from,
-        to
-      }
+      value: '$' + salesData.reduce((accum, item) => accum + item),
     });
 
     const customersChart = new ColumnChart({
-      url: 'api/dashboard/customers',
+      data: customersData,
       label: 'customers',
-      range: {
-        from,
-        to
-      }
+      value: customersData.reduce((accum, item) => accum + item),
     });
 
-    this.components.sortableTable = sortableTable;
-    this.components.ordersChart = ordersChart;
-    this.components.salesChart = salesChart;
-    this.components.customersChart = customersChart;
-    this.components.rangePicker = rangePicker;
+    this.components = {
+      sortableTable,
+      ordersChart,
+      salesChart,
+      customersChart,
+      rangePicker
+    };
   }
 
   get template () {
@@ -84,7 +97,9 @@ export default class Page {
         <div data-element="salesChart" class="dashboard__chart_sales"></div>
         <div data-element="customersChart" class="dashboard__chart_customers"></div>
       </div>
+
       <h3 class="block-title">Best sellers</h3>
+
       <div data-element="sortableTable">
         <!-- sortable-table component -->
       </div>
@@ -99,7 +114,7 @@ export default class Page {
     this.element = element.firstElementChild;
     this.subElements = this.getSubElements(this.element);
 
-    this.initComponents();
+    await this.initComponents();
 
     this.renderComponents();
     this.initEventListeners();
@@ -129,20 +144,15 @@ export default class Page {
   initEventListeners () {
     this.components.rangePicker.element.addEventListener('date-select', event => {
       const { from, to } = event.detail;
-
-      this.updateComponents(from, to);
+      this.updateChartsComponents(from, to);
+      this.updateTableComponent(from, to);
     });
   }
 
-  remove () {
-    this.element.remove();
-  }
-
   destroy () {
-    this.remove();
-
     for (const component of Object.values(this.components)) {
       component.destroy();
     }
   }
 }
+
